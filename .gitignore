@@ -1,0 +1,14 @@
+# Thông tin bí mật - KHÔNG upload lên GitHub
+.env
+bot.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE
+.vscode/
+.idea/

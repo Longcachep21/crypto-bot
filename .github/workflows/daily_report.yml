@@ -1,0 +1,31 @@
+name: 🤖 Crypto Daily Report
+
+on:
+  schedule:
+    # 10:00 sáng giờ Việt Nam = 03:00 UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:   # Cho phép chạy thủ công bất cứ lúc nào
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Tải code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Cài Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: 📦 Cài thư viện
+        run: pip install -r requirements.txt
+
+      - name: 🚀 Gửi báo cáo lên Telegram
+        run: python main.py --test
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

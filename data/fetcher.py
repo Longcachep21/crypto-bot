@@ -1,186 +1,236 @@
-import requests
+"""
+fetcher.py – Thu thập dữ liệu thị trường crypto
+Chiến lược: CoinGecko Markets (sparkline=true) → 1 request duy nhất
+            lấy được: giá, 24h, 7d, VÀ dữ liệu sparkline để tính RSI
+Không dùng Binance (bị chặn 451 trên GitHub Actions)
+"""
+
+import time
 import logging
+import requests
 
 logger = logging.getLogger(__name__)
 
-BINANCE_SPOT     = "https://api.binance.com"
-BINANCE_FUTURES  = "https://fapi.binance.com"
-FEAR_GREED_URL   = "https://api.alternative.me/fng/?limit=1"
-DEFILLAMA_URL    = "https://api.llama.fi/v2/chains"
-COINGECKO_GLOBAL = "https://api.coingecko.com/api/v3/global"
+FEAR_GREED_URL    = "https://api.alternative.me/fng/?limit=1"
+DEFILLAMA_URL     = "https://api.llama.fi/v2/chains"
+COINGECKO_GLOBAL  = "https://api.coingecko.com/api/v3/global"
 COINGECKO_MARKETS = "https://api.coingecko.com/api/v3/coins/markets"
 
-# Mapping: Binance symbol -> CoinGecko ID
+# ─────────────────────────────────────────────────────────────
+#  Mapping symbol → CoinGecko ID
+# ─────────────────────────────────────────────────────────────
 SYMBOL_TO_CG = {
-    "BTCUSDT":"bitcoin","ETHUSDT":"ethereum","BNBUSDT":"binancecoin",
-    "SOLUSDT":"solana","XRPUSDT":"ripple","DOGEUSDT":"dogecoin",
-    "ADAUSDT":"cardano","AVAXUSDT":"avalanche-2","TONUSDT":"the-open-network",
-    "SHIBUSDT":"shiba-inu","DOTUSDT":"polkadot","LINKUSDT":"chainlink",
-    "MATICUSDT":"matic-network","UNIUSDT":"uniswap","LTCUSDT":"litecoin",
-    "NEARUSDT":"near","TRXUSDT":"tron","ICPUSDT":"internet-computer",
-    "ETCUSDT":"ethereum-classic","HBARUSDT":"hedera-hashgraph",
-    "APTUSDT":"aptos","SUIUSDT":"sui","OPUSDT":"optimism","ARBUSDT":"arbitrum",
-    "STXUSDT":"blockstack","ATOMUSDT":"cosmos","ALGOUSDT":"algorand",
-    "VETUSDT":"vechain","EGLDUSDT":"elrond-erd-2","FILUSDT":"filecoin",
-    "FLOWUSDT":"flow","XMRUSDT":"monero","ZECUSDT":"zcash",
-    "QNTUSDT":"quant-network","DASHUSDT":"dash","AAVEUSDT":"aave",
-    "MKRUSDT":"maker","CRVUSDT":"curve-dao-token","LDOUSDT":"lido-dao",
-    "RUNEUSDT":"thorchain","DYDXUSDT":"dydx-chain","GMXUSDT":"gmx",
-    "SNXUSDT":"havven","COMPUSDT":"compound-governance-token",
-    "INJUSDT":"injective-protocol","AXSUSDT":"axie-infinity",
-    "SANDUSDT":"the-sandbox","MANAUSDT":"decentraland","GALAUSDT":"gala",
-    "CHZUSDT":"chiliz","APEUSDT":"apecoin","ENSUSDT":"ethereum-name-service",
-    "GRTUSDT":"the-graph","BATUSDT":"basic-attention-token","ZILUSDT":"zilliqa",
-    "PEPEUSDT":"pepe","WIFUSDT":"dogwifcoin","BONKUSDT":"bonk",
-    "FLOKIUSDT":"floki","NOTUSDT":"notcoin","WLDUSDT":"worldcoin-wld",
-    "TIAUSDT":"celestia","PYTHUSDT":"pyth-network",
-    "JUPUSDT":"jupiter-exchange-solana","ENAUSDT":"ethena",
-    "STRKUSDT":"starknet","SEIUSDT":"sei-network","IOTAUSDT":"iota",
+    "BTCUSDT":   "bitcoin",
+    "ETHUSDT":   "ethereum",
+    "BNBUSDT":   "binancecoin",
+    "SOLUSDT":   "solana",
+    "XRPUSDT":   "ripple",
+    "DOGEUSDT":  "dogecoin",
+    "ADAUSDT":   "cardano",
+    "AVAXUSDT":  "avalanche-2",
+    "TONUSDT":   "the-open-network",
+    "SHIBUSDT":  "shiba-inu",
+    "DOTUSDT":   "polkadot",
+    "LINKUSDT":  "chainlink",
+    "MATICUSDT": "matic-network",
+    "UNIUSDT":   "uniswap",
+    "LTCUSDT":   "litecoin",
+    "NEARUSDT":  "near",
+    "TRXUSDT":   "tron",
+    "ICPUSDT":   "internet-computer",
+    "ETCUSDT":   "ethereum-classic",
+    "HBARUSDT":  "hedera-hashgraph",
+    "APTUSDT":   "aptos",
+    "SUIUSDT":   "sui",
+    "OPUSDT":    "optimism",
+    "ARBUSDT":   "arbitrum",
+    "STXUSDT":   "blockstack",
+    "ATOMUSDT":  "cosmos",
+    "ALGOUSDT":  "algorand",
+    "VETUSDT":   "vechain",
+    "FILUSDT":   "filecoin",
+    "FLOWUSDT":  "flow",
+    "XMRUSDT":   "monero",
+    "ZECUSDT":   "zcash",
+    "AAVEUSDT":  "aave",
+    "MKRUSDT":   "maker",
+    "LDOUSDT":   "lido-dao",
+    "INJUSDT":   "injective-protocol",
+    "AXSUSDT":   "axie-infinity",
+    "SANDUSDT":  "the-sandbox",
+    "MANAUSDT":  "decentraland",
+    "GALAUSDT":  "gala",
+    "CHZUSDT":   "chiliz",
+    "APEUSDT":   "apecoin",
+    "ENSUSDT":   "ethereum-name-service",
+    "GRTUSDT":   "the-graph",
+    "PEPEUSDT":  "pepe",
+    "WIFUSDT":   "dogwifcoin",
+    "BONKUSDT":  "bonk",
+    "FLOKIUSDT": "floki",
+    "WLDUSDT":   "worldcoin-wld",
+    "TIAUSDT":   "celestia",
+    "JUPUSDT":   "jupiter-exchange-solana",
+    "ENAUSDT":   "ethena",
+    "SEIUSDT":   "sei-network",
+    "IOTAUSDT":  "iota",
+    "NOTUSDT":   "notcoin",
+    "FETUSDT":   "fetch-ai",
+    "RENDERUSDT":"render-token",
+    "RUNEUSDT":  "thorchain",
+    "COMPUSDT":  "compound-governance-token",
+    "SNXUSDT":   "havven",
+    "BATUSDT":   "basic-attention-token",
 }
 
-
-# ─────────────────────────────────────────────────────────────
-#  CoinGecko: Giá + 24h + 7d (dùng cho GitHub Actions)
-# ─────────────────────────────────────────────────────────────
-def get_coingecko_prices(symbols: list) -> dict:
-    """Lấy giá từ CoinGecko — hoạt động trên mọi server."""
-    cg_ids = [SYMBOL_TO_CG[s] for s in symbols if s in SYMBOL_TO_CG]
-    id_to_sym = {v: k for k, v in SYMBOL_TO_CG.items()}
-    results = {s: None for s in symbols}
-    if not cg_ids:
-        return results
-    try:
-        resp = requests.get(
-            COINGECKO_MARKETS,
-            params={
-                "vs_currency": "usd",
-                "ids": ",".join(cg_ids),
-                "per_page": 250,
-                "page": 1,
-                "price_change_percentage": "24h,7d",
-                "sparkline": "false",
-            },
-            timeout=20,
-        )
-        resp.raise_for_status()
-        for coin in resp.json():
-            sym = id_to_sym.get(coin["id"])
-            if sym and sym in results:
-                ch24 = coin.get("price_change_percentage_24h") or 0
-                results[sym] = {
-                    "price":       coin["current_price"],
-                    "change_pct":  ch24,
-                    "change_usd":  coin.get("price_change_24h") or 0,
-                    "volume_usdt": coin.get("total_volume") or 0,
-                    "high_24h":    coin.get("high_24h") or 0,
-                    "low_24h":     coin.get("low_24h") or 0,
-                    "change_7d":   coin.get("price_change_percentage_7d_in_currency") or 0,
-                }
-    except Exception as e:
-        logger.error(f"[CoinGecko prices]: {e}")
-    return results
+CG_ID_TO_SYM = {v: k for k, v in SYMBOL_TO_CG.items()}
 
 
 # ─────────────────────────────────────────────────────────────
-#  Binance batch (nhanh, dùng khi chạy local)
+#  Helper: HTTP GET với retry
 # ─────────────────────────────────────────────────────────────
-def get_binance_prices(symbols: list) -> dict:
-    try:
-        resp = requests.get(f"{BINANCE_SPOT}/api/v3/ticker/24hr", timeout=10)
-        resp.raise_for_status()
-        all_tickers = {t["symbol"]: t for t in resp.json()}
-        results = {}
-        for sym in symbols:
-            d = all_tickers.get(sym)
-            if d:
-                results[sym] = {
-                    "price":       float(d["lastPrice"]),
-                    "change_pct":  float(d["priceChangePercent"]),
-                    "change_usd":  float(d["priceChange"]),
-                    "volume_usdt": float(d["quoteVolume"]),
-                    "high_24h":    float(d["highPrice"]),
-                    "low_24h":     float(d["lowPrice"]),
-                    "change_7d":   None,
-                }
+def _get(url: str, params: dict = None, retries: int = 3, timeout: int = 30) -> requests.Response | None:
+    for attempt in range(retries):
+        try:
+            resp = requests.get(url, params=params, timeout=timeout)
+            if resp.status_code == 429:
+                wait = 35 * (attempt + 1)
+                logger.warning(f"Rate limit 429 – chờ {wait}s (lần {attempt+1}/{retries})...")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            return resp
+        except requests.exceptions.HTTPError as e:
+            code = e.response.status_code if e.response is not None else 0
+            logger.error(f"HTTP {code}: {url}")
+            if code in (429, 503):
+                time.sleep(30 * (attempt + 1))
             else:
-                results[sym] = None
-        return results
-    except Exception as e:
-        logger.error(f"[Binance batch]: {e}")
-        return {s: None for s in symbols}
-
-
-def get_prices(symbols: list) -> dict:
-    """Thử Binance trước, nếu bị chặn dùng CoinGecko."""
-    results = get_binance_prices(symbols)
-    valid = sum(1 for v in results.values() if v is not None)
-    if valid < len(symbols) * 0.3:  # <30% thành công → dùng CoinGecko
-        logger.warning(f"Binance trả về {valid}/{len(symbols)} coin, chuyển sang CoinGecko...")
-        results = get_coingecko_prices(symbols)
-    return results
+                return None
+        except Exception as e:
+            logger.error(f"Request error ({attempt+1}/{retries}): {e}")
+            time.sleep(5)
+    return None
 
 
 # ─────────────────────────────────────────────────────────────
-#  Funding Rate (Binance Futures)
+#  RSI từ sparkline (168 giờ = 7 ngày)
 # ─────────────────────────────────────────────────────────────
-def get_funding_rates(symbols: list) -> dict:
-    try:
-        resp = requests.get(f"{BINANCE_FUTURES}/fapi/v1/premiumIndex", timeout=10)
-        resp.raise_for_status()
-        all_rates = {item["symbol"]: item for item in resp.json()}
-        results = {}
-        for sym in symbols:
-            item = all_rates.get(sym)
-            if item and item.get("lastFundingRate"):
-                results[sym] = round(float(item["lastFundingRate"]) * 100, 4)
-            else:
-                results[sym] = None
-        return results
-    except Exception as e:
-        logger.error(f"[Funding Rate]: {e}")
-        return {s: None for s in symbols}
-
-
-# ─────────────────────────────────────────────────────────────
-#  RSI từ Binance klines
-# ─────────────────────────────────────────────────────────────
-def _calculate_rsi(closes: list, period: int = 14) -> float | None:
-    if len(closes) < period + 1:
+def _calc_rsi(prices: list, period: int = 14) -> float | None:
+    if not prices or len(prices) < period + 1:
         return None
-    deltas = [closes[i] - closes[i-1] for i in range(1, len(closes))]
+    deltas = [prices[i] - prices[i - 1] for i in range(1, len(prices))]
     gains  = [max(d, 0) for d in deltas]
     losses = [abs(min(d, 0)) for d in deltas]
-    avg_gain = sum(gains[-period:]) / period
-    avg_loss = sum(losses[-period:]) / period
-    if avg_loss == 0:
+    avg_g  = sum(gains[-period:]) / period
+    avg_l  = sum(losses[-period:]) / period
+    if avg_l == 0:
         return 100.0
-    return round(100 - (100 / (1 + avg_gain / avg_loss)), 1)
+    return round(100 - 100 / (1 + avg_g / avg_l), 1)
+
+
+# ─────────────────────────────────────────────────────────────
+#  CoinGecko Markets: giá + 24h + 7d + sparkline (RSI)
+#  Chỉ CẦN 1-2 REQUEST cho toàn bộ danh sách coin
+# ─────────────────────────────────────────────────────────────
+def get_all_data(symbols: list) -> tuple[dict, dict]:
+    """
+    Trả về (prices, extended) cho tất cả symbols.
+    Chỉ gọi CoinGecko 1-2 lần, không gọi riêng lẻ.
+    """
+    cg_ids  = [SYMBOL_TO_CG[s] for s in symbols if s in SYMBOL_TO_CG]
+    prices  = {s: None for s in symbols}
+    extended = {s: None for s in symbols}
+
+    if not cg_ids:
+        return prices, extended
+
+    # CoinGecko cho phép ~250 IDs/request, chia batch nếu vượt
+    batch_size = 200
+    for i in range(0, len(cg_ids), batch_size):
+        batch = cg_ids[i : i + batch_size]
+        resp = _get(
+            COINGECKO_MARKETS,
+            params={
+                "vs_currency":             "usd",
+                "ids":                     ",".join(batch),
+                "per_page":                250,
+                "page":                    1,
+                "price_change_percentage": "24h,7d",
+                "sparkline":               "true",   # ← lấy 168h giá để tính RSI
+            },
+            retries=4,
+            timeout=30,
+        )
+
+        if resp is None:
+            logger.error("[CoinGecko] Không lấy được dữ liệu.")
+            continue
+
+        data = resp.json()
+        if not isinstance(data, list):
+            logger.error(f"[CoinGecko] Phản hồi lạ: {str(data)[:200]}")
+            continue
+
+        for coin in data:
+            sym = CG_ID_TO_SYM.get(coin.get("id"))
+            if not sym or sym not in prices:
+                continue
+
+            ch24 = coin.get("price_change_percentage_24h") or 0.0
+            ch7  = coin.get("price_change_percentage_7d_in_currency") or 0.0
+            vol  = coin.get("total_volume") or 0.0
+
+            prices[sym] = {
+                "price":       coin.get("current_price") or 0.0,
+                "change_pct":  ch24,
+                "change_usd":  coin.get("price_change_24h") or 0.0,
+                "volume_usdt": vol,
+                "high_24h":    coin.get("high_24h") or 0.0,
+                "low_24h":     coin.get("low_24h") or 0.0,
+                "change_7d":   ch7,
+            }
+
+            # Tính RSI từ sparkline (không cần thêm API call)
+            spark = coin.get("sparkline_in_7d", {}) or {}
+            spark_prices = spark.get("price", [])
+            rsi = _calc_rsi(spark_prices) if spark_prices else None
+
+            # Volume ratio: so sánh vol hôm nay với avg 7 ngày
+            # (sparkline không có vol, dùng vol mCap ratio thay thế)
+            extended[sym] = {
+                "rsi":       rsi,
+                "change_7d": ch7,
+                "vol_ratio": 1.0,  # không có dữ liệu vol lịch sử từ endpoint này
+            }
+
+        # Nếu còn batch tiếp theo, nghỉ 8 giây
+        if i + batch_size < len(cg_ids):
+            logger.info("Chờ 8s trước batch tiếp theo...")
+            time.sleep(8)
+
+    ok_p = sum(1 for v in prices.values()   if v is not None)
+    ok_e = sum(1 for v in extended.values() if v is not None)
+    logger.info(f"[CoinGecko] Giá: {ok_p}/{len(symbols)} | RSI: {ok_e}/{len(symbols)}")
+    return prices, extended
+
+
+# ─────────────────────────────────────────────────────────────
+#  Public wrapper (giữ interface cũ)
+# ─────────────────────────────────────────────────────────────
+def get_prices(symbols: list) -> dict:
+    prices, _ = get_all_data(symbols)
+    return prices
 
 
 def get_extended_data(symbols: list) -> dict:
-    """RSI + volume spike từ Binance klines."""
-    results = {}
-    for sym in symbols:
-        try:
-            url  = f"{BINANCE_SPOT}/api/v3/klines?symbol={sym}&interval=1d&limit=16"
-            resp = requests.get(url, timeout=10)
-            resp.raise_for_status()
-            klines = resp.json()
-            if len(klines) < 8:
-                results[sym] = None
-                continue
-            closes     = [float(k[4]) for k in klines]
-            quote_vols = [float(k[7]) for k in klines]
-            vol_avg_7d = sum(quote_vols[-8:-1]) / 7
-            results[sym] = {
-                "rsi":       _calculate_rsi(closes),
-                "change_7d": round((closes[-1] - closes[-8]) / closes[-8] * 100, 2),
-                "vol_ratio": round(quote_vols[-1] / vol_avg_7d, 2) if vol_avg_7d else 1.0,
-            }
-        except Exception as e:
-            logger.error(f"[Extended] {sym}: {e}")
-            results[sym] = None
-    return results
+    _, extended = get_all_data(symbols)
+    return extended
+
+
+def get_funding_rates(symbols: list) -> dict:
+    """Funding rate không khả dụng (Binance bị chặn 451). Trả về None."""
+    return {s: None for s in symbols}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -188,8 +238,9 @@ def get_extended_data(symbols: list) -> dict:
 # ─────────────────────────────────────────────────────────────
 def get_fear_greed() -> dict | None:
     try:
-        resp = requests.get(FEAR_GREED_URL, timeout=10)
-        resp.raise_for_status()
+        resp = _get(FEAR_GREED_URL, retries=3, timeout=15)
+        if resp is None:
+            return None
         item = resp.json()["data"][0]
         return {"value": int(item["value"]), "label": item["value_classification"]}
     except Exception as e:
@@ -202,13 +253,18 @@ def get_fear_greed() -> dict | None:
 # ─────────────────────────────────────────────────────────────
 def get_defillama_tvl() -> dict | None:
     try:
-        resp = requests.get(DEFILLAMA_URL, timeout=15)
-        resp.raise_for_status()
+        resp = _get(DEFILLAMA_URL, retries=3, timeout=20)
+        if resp is None:
+            return None
         chains = sorted(resp.json(), key=lambda x: x.get("tvl", 0), reverse=True)
         return {
             "total_tvl": sum(c.get("tvl", 0) for c in chains),
             "top_chains": [
-                {"name": c["name"], "tvl": c.get("tvl", 0), "change_1d": c.get("change_1d", 0) or 0}
+                {
+                    "name":      c["name"],
+                    "tvl":       c.get("tvl", 0),
+                    "change_1d": c.get("change_1d", 0) or 0,
+                }
                 for c in chains[:3]
             ],
         }
@@ -222,8 +278,9 @@ def get_defillama_tvl() -> dict | None:
 # ─────────────────────────────────────────────────────────────
 def get_btc_dominance() -> float | None:
     try:
-        resp = requests.get(COINGECKO_GLOBAL, timeout=10)
-        resp.raise_for_status()
+        resp = _get(COINGECKO_GLOBAL, retries=3, timeout=15)
+        if resp is None:
+            return None
         return round(resp.json()["data"]["market_cap_percentage"]["btc"], 1)
     except Exception as e:
         logger.error(f"[BTC Dominance]: {e}")
@@ -231,16 +288,19 @@ def get_btc_dominance() -> float | None:
 
 
 # ─────────────────────────────────────────────────────────────
-#  FETCH ALL
+#  FETCH ALL – gọi hàm duy nhất
 # ─────────────────────────────────────────────────────────────
 def fetch_all(coins: list) -> dict:
     from config import MAJOR_COINS
-    logger.info("📡 Đang thu thập dữ liệu thị trường...")
-    prices = get_prices(coins)
+    logger.info("📡 Đang thu thập dữ liệu thị trường (CoinGecko)...")
+
+    # 1 lần gọi duy nhất cho cả prices + RSI
+    prices, extended = get_all_data(coins)
+
     return {
         "prices":        prices,
         "funding_rates": get_funding_rates(coins),
-        "extended":      get_extended_data(MAJOR_COINS),
+        "extended":      extended,
         "fear_greed":    get_fear_greed(),
         "defi_tvl":      get_defillama_tvl(),
         "btc_dominance": get_btc_dominance(),

@@ -35,7 +35,7 @@ def start_scheduler():
         func    = run_report,
         trigger = CronTrigger(hour=REPORT_HOUR, minute=REPORT_MINUTE, timezone=tz),
         id      = "daily_crypto_report",
-        name    = "Báo cáo crypto 14:00",
+        name    = "Báo cáo crypto 13:00",
         replace_existing = True,
     )
 

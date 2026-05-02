@@ -2,8 +2,8 @@ name: 🤖 Crypto Daily Report
 
 on:
   schedule:
-    # 10:00 sáng giờ Việt Nam = 03:00 UTC
-    - cron: '0 3 * * *'
+    # 13:00 chiều giờ Việt Nam = 06:00 UTC
+    - cron: '0 6 * * *'
   workflow_dispatch:   # Cho phép chạy thủ công bất cứ lúc nào
 
 jobs:

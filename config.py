@@ -74,5 +74,5 @@ MAJOR_COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
 
 # ===== LỊCH GỬI BÁO CÁO =====
 TIMEZONE       = "Asia/Ho_Chi_Minh"
-REPORT_HOUR    = 10
+REPORT_HOUR    = 13   # 13:00 giờ Việt Nam
 REPORT_MINUTE  = 0

@@ -1,78 +1,23 @@
-import os
-from dotenv import load_dotenv
+# ============================================================
+#  CẤU HÌNH BOT - BẠN CHỈ CẦN SỬA FILE NÀY
+# ============================================================
 
-load_dotenv()
+# --- 1. Thông tin Telegram (xem hướng dẫn lấy trong README) ---
+TELEGRAM_TOKEN = "8886739251:AAHUaQP9kYe2v5Rue2DYylHuzjD4XYqiFUk"     # Token bot lấy từ @BotFather
+TELEGRAM_CHAT_ID = "8111145571"     # ID chat của bạn
 
-# ===== TELEGRAM =====
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID", "")
+# --- 2. Coin theo dõi ---
+# Bot tự lấy top coin theo vốn hóa, từ hạng THEO_DOI_TU đến THEO_DOI_DEN.
+THEO_DOI_TU = 50      # bắt đầu từ hạng (vốn hóa) thứ mấy
+THEO_DOI_DEN = 100 # đến hạng thứ mấy
 
-# ===== API KEYS =====
-COINGECKO_API_KEY     = os.getenv("COINGECKO_API_KEY", "")
-COINMARKETCAP_API_KEY = os.getenv("COINMARKETCAP_API_KEY", "")
-ETHERSCAN_API_KEY     = os.getenv("ETHERSCAN_API_KEY", "")
-CRYPTOPANIC_API_KEY   = os.getenv("CRYPTOPANIC_API_KEY", "")
+# Nếu muốn theo dõi THÊM vài coin cụ thể (id CoinGecko, chữ thường), điền vào đây.
+# Để trống [] cũng được. Ví dụ: ["bitcoin", "ethereum"]
+COIN_THEM = ["bitcoin", "ethereum"]
 
-# ===== COIN THEO DÕI (70 coin) =====
-COINS = [
-    # 👑 Mega Cap
-    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-    # 🔵 Large Cap
-    "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "TONUSDT", "SHIBUSDT",
-    "DOTUSDT", "LINKUSDT", "MATICUSDT", "UNIUSDT", "LTCUSDT",
-    "NEARUSDT", "TRXUSDT", "ICPUSDT", "ETCUSDT", "HBARUSDT",
-    # ⚡ Layer 1 & Layer 2
-    "APTUSDT", "SUIUSDT", "OPUSDT", "ARBUSDT", "STXUSDT",
-    "ATOMUSDT", "ALGOUSDT", "VETUSDT", "EGLDUSDT", "FILUSDT",
-    "FLOWUSDT", "XMRUSDT", "ZECUSDT", "DASHUSDT", "QNTUSDT",
-    # 🏦 DeFi
-    "AAVEUSDT", "UNIUSDT", "MKRUSDT", "CRVUSDT", "LDOUSDT",
-    "DYDXUSDT", "GMXUSDT", "RUNEUSDT", "SNXUSDT", "COMPUSDT",
-    # 🎮 Gaming & NFT & Metaverse
-    "AXSUSDT", "SANDUSDT", "MANAUSDT", "GALAUSDT", "CHZUSDT",
-    "APEUSDT", "INJUSDT", "ENSUSDT", "GRTUSDT", "BATUSDT",
-    # 🔥 Trending & Meme
-    "PEPEUSDT", "WIFUSDT", "BONKUSDT", "FLOKIUSDT", "SHIBUSDT",
-    "NOTUSDT", "WLDUSDT", "BLURUS DT", "TIAUSDT", "PYTHUSDT",
-    # 🌐 Infrastructure & Oracle
-    "JUPUSDT", "ENAUSDT", "STRKUSDT", "SEIUS DT", "ZILUSDT",
-]
+# --- 3. Giờ gửi bản tin hằng ngày (giờ Việt Nam, dạng 24h) ---
+GIO_GUI_BAN_TIN = ["08:00", "14:00"]
 
-# Loại bỏ trùng lặp và giữ thứ tự
-seen = set()
-COINS = [
-    c for c in [
-        # 👑 Mega Cap
-        "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT",
-        # 🔵 Large Cap
-        "DOGEUSDT","ADAUSDT","AVAXUSDT","TONUSDT","SHIBUSDT",
-        "DOTUSDT","LINKUSDT","MATICUSDT","UNIUSDT","LTCUSDT",
-        "NEARUSDT","TRXUSDT","ICPUSDT","ETCUSDT","HBARUSDT",
-        # ⚡ Layer 1 & Layer 2
-        "APTUSDT","SUIUSDT","OPUSDT","ARBUSDT","STXUSDT",
-        "ATOMUSDT","ALGOUSDT","VETUSDT","EGLDUSDT","FILUSDT",
-        "FLOWUSDT","XMRUSDT","ZECUSDT","QNTUSDT","DASHUSDT",
-        # 🏦 DeFi
-        "AAVEUSDT","MKRUSDT","CRVUSDT","LDOUSDT","RUNEUSDT",
-        "DYDXUSDT","GMXUSDT","SNXUSDT","COMPUSDT","INJUSDT",
-        # 🎮 Gaming & NFT
-        "AXSUSDT","SANDUSDT","MANAUSDT","GALAUSDT","CHZUSDT",
-        "APEUSDT","ENSUSDT","GRTUSDT","BATUSDT","ZILUSDT",
-        # 🔥 Trending & Meme
-        "PEPEUSDT","WIFUSDT","BONKUSDT","FLOKIUSDT","NOTUSDT",
-        "WLDUSDT","TIAUSDT","PYTHUSDT","JUPUSDT","ENAUSDT",
-        # 🌐 Khác
-        "STRKUSDT","SEIUSDT","BLRUSDT","HFTUSDT","IOTAUSDT",
-    ]
-    if c not in seen and not seen.add(c)
-]
-
-COIN_LABELS = {c: c.replace("USDT", "") for c in COINS}
-
-# Coin luôn hiển thị đầy đủ trong báo cáo
-MAJOR_COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
-
-# ===== LỊCH GỬI BÁO CÁO =====
-TIMEZONE       = "Asia/Ho_Chi_Minh"
-REPORT_HOUR    = 13   # 13:00 giờ Việt Nam
-REPORT_MINUTE  = 0
+# --- 4. Ngưỡng cảnh báo biến động realtime ---
+NGUONG_BIEN_DONG = 5.0      # cảnh báo khi giá đổi +/- bao nhiêu % trong 1 giờ
+PHUT_KIEM_TRA = 5           # cứ bao nhiêu phút kiểm tra giá một lần

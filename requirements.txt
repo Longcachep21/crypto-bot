@@ -1,18 +1,2 @@
-# Telegram Bot
-python-telegram-bot==20.7
-
-# Lập lịch tự động
-APScheduler==3.10.4
-
-# Crypto data
-pycoingecko==3.1.0
-requests==2.31.0
-
-# Dịch thuật EN -> VI
-deep-translator==1.11.4
-
-# Xử lý dữ liệu
-python-dotenv==1.0.0
-
-# Tiện ích
-pytz==2024.1
+requests
+schedule
